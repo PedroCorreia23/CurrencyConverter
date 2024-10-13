@@ -7,7 +7,9 @@ def get_supported_coins():
 
     if response.status_code == 200:
         coins_list = response.json()
+        # Map symbols to their corresponding CoinGecko IDs
         coin_mapping = {coin['symbol']: coin['id'] for coin in coins_list}
+        
         return coin_mapping
     else:
         print(f"Error: Unable to fetch supported coins (Status code: {response.status_code})")
@@ -27,6 +29,9 @@ def get_price_in_usd(crypto_id):
 
 # Function to verify and convert currencies
 def verify_currency():
+    # Show ticker symbol usage alert
+    print("Please use the **ticker symbols** (e.g., 'btc' for Bitcoin, 'eth' for Ethereum, 'sol' for Solana).")
+    
     # Fetch supported coins from CoinGecko
     coin_mapping = get_supported_coins()
     
@@ -38,17 +43,17 @@ def verify_currency():
 
     while True:
         # Get the source currency from user input
-        from_currency = input('Enter the currency you want to convert: ').lower()
+        from_currency = input('Enter the currency you want to convert (ticker symbol): ').lower()
 
         if from_currency not in coin_mapping:
-            print(f'{from_currency.upper()} is not in our supported coins list. Please enter a valid currency symbol.')
+            print(f"Invalid currency! Please enter the **ticker symbol** (e.g., 'btc', 'eth', 'sol'). '{from_currency.upper()}' is not in our list.")
             continue
 
         # Get the target currency from user input
-        to_currency = input(f'Enter the currency you want to convert {from_currency.upper()} to: ').lower()
+        to_currency = input(f'Enter the currency you want to convert {from_currency.upper()} to (ticker symbol): ').lower()
 
         if to_currency not in coin_mapping:
-            print(f'{to_currency.upper()} is not in our supported coins list. Please enter a valid currency symbol.')
+            print(f"Invalid currency! Please enter the **ticker symbol** (e.g., 'btc', 'eth', 'sol'). '{to_currency.upper()}' is not in our list.")
             continue
 
         from_currency_id = coin_mapping[from_currency]
@@ -57,6 +62,10 @@ def verify_currency():
         # Fetch the prices in USD for both cryptocurrencies
         from_price_usd = get_price_in_usd(from_currency_id)
         to_price_usd = get_price_in_usd(to_currency_id)
+
+        # Print fetched USD prices for debugging
+        print(f"Price of 1 {from_currency.upper()} in USD: {from_price_usd}")
+        print(f"Price of 1 {to_currency.upper()} in USD: {to_price_usd}")
 
         if from_price_usd is None or to_price_usd is None:
             print(f"Unable to fetch prices for {from_currency.upper()} or {to_currency.upper()}")
