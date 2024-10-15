@@ -3,7 +3,7 @@ import requests
 
 app = Flask(__name__)
 
-FIAT_API_KEY = 'cd10a4a0d36f903b73894034'  # Add your real API key here
+FIAT_API_KEY = ''  # Add your real API key here
 
 # Function to fetch fiat conversion rate using ExchangeRate-API
 def get_fiat_rate(from_currency, to_currency, amount=None):
