@@ -6,78 +6,123 @@
     <title>Currency Converter</title>
     <!-- Link to external CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div class="container">
     <h1>Currency Converter</h1>
 
-    <form id="currency-form">
+    <form id="currency-form" onsubmit="event.preventDefault(); convertCurrency();"> <!-- No need for submit button -->
         <div class="input-group">
-            <div class="input-box">
+            <div class="input-box with-image">
                 <label for="from_currency">From Currency:</label>
-                <input type="text" id="from_currency" name="from_currency" placeholder="e.g., BTC or USD" required>
+                <div class="input-wrapper">
+                    <img id="from_currency_img" src="" alt="Currency Image" class="currency-img-left"> <!-- Left side image -->
+                    <input type="text" id="from_currency" name="from_currency" placeholder="e.g., BTC or USD" required>
+                </div>
             </div>
-            <div class="input-box">
+            <div class="input-box with-image">
                 <label for="to_currency">To Currency:</label>
-                <input type="text" id="to_currency" name="to_currency" placeholder="e.g., ETH or EUR" required>
+                <div class="input-wrapper">
+                    <input type="text" id="to_currency" name="to_currency" placeholder="e.g., ETH or EUR" required>
+                    <img id="to_currency_img" src="" alt="Currency Image" class="currency-img-right"> <!-- Right side image -->
+                </div>
             </div>
         </div>
 
-        <label for="amount">Amount:</label>
-        <input type="number" id="amount" name="amount" step="0.01" placeholder="Enter amount" required>
+        <div class="amount-box">
+            <label for="amount">Amount:</label>
+            <input type="number" id="amount" name="amount" step="0.01" placeholder="Enter amount" required>
+        </div>
 
-        <div id="loading" style="display: none;">Converting...</div>
+        <div id="loading" style="display: none;" class="loading-spinner"></div> <!-- Loading spinner -->
     </form>
 
     <div id="result"></div>
 
-    <p>Use ticker symbols for cryptocurrencies (e.g., BTC, ETH) and ISO codes for fiat currencies (e.g., USD, EUR).</p>
+    <p class="instructions">Use ticker symbols for cryptocurrencies (e.g., BTC, ETH) and ISO codes for fiat currencies (e.g., USD, EUR).</p>
 </div>
 
 <script>
-    // Function to fetch conversion result via AJAX
-function convertCurrency() {
-    const fromCurrency = document.getElementById("from_currency").value;
-    const toCurrency = document.getElementById("to_currency").value;
-    const amount = document.getElementById("amount").value;
+    // Function to fetch cryptocurrency logos from CoinGecko API
+    function updateCurrencyImage(currency, elementId) {
+        fetch(`https://api.coingecko.com/api/v3/coins/list`)
+        .then(response => response.json())
+        .then(data => {
+            // Find the currency object from CoinGecko's response
+            const coin = data.find(coin => coin.symbol === currency.toLowerCase());
 
-    if (fromCurrency === "" || toCurrency === "" || amount === "") {
-        document.getElementById("result").innerHTML = "Please fill out all fields.";
-        return;
+            if (coin) {
+                // Fetch the coin details to get the image URL
+                fetch(`https://api.coingecko.com/api/v3/coins/${coin.id}`)
+                .then(response => response.json())
+                .then(coinData => {
+                    // Update the image source based on the currency chosen
+                    document.getElementById(elementId).src = coinData.image.thumb;
+                })
+                .catch(error => console.error('Error fetching coin data:', error));
+            }
+        })
+        .catch(error => console.error('Error fetching coin list:', error));
     }
 
-    // Show loading message
-    document.getElementById("loading").style.display = "block";
+    // Function to fetch conversion result via AJAX
+    function convertCurrency() {
+        const fromCurrency = document.getElementById("from_currency").value;
+        const toCurrency = document.getElementById("to_currency").value;
+        const amount = document.getElementById("amount").value;
 
-    // Make AJAX request to convert the currency
-    fetch("/convert", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            from_currency: fromCurrency,
-            to_currency: toCurrency,
-            amount: amount,
-        }),
-    })
-    .then(response => response.text())
-    .then(result => {
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("result").innerHTML = result;
-    })
-    .catch(error => {
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("result").innerHTML = "Error: " + error;
+        if (fromCurrency === "" || toCurrency === "" || amount === "") {
+            document.getElementById("result").innerHTML = "Please fill out all fields.";
+            return;
+        }
+
+        // Show loading spinner
+        document.getElementById("loading").style.display = "block";
+
+        // Make AJAX request to convert the currency
+        fetch("/convert", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                from_currency: fromCurrency,
+                to_currency: toCurrency,
+                amount: amount,
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("result").innerHTML = data.result;
+
+            // Update the currency images if available
+            if (data.from_image) {
+                document.getElementById("from_currency_img").src = data.from_image;
+            }
+            if (data.to_image) {
+                document.getElementById("to_currency_img").src = data.to_image;
+            }
+        })
+        .catch(error => {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("result").innerHTML = "Error: " + error;
+        });
+    }
+
+    // Add event listeners to update images dynamically
+    document.getElementById("from_currency").addEventListener("input", function() {
+        const currency = document.getElementById("from_currency").value;
+        updateCurrencyImage(currency, "from_currency_img");
     });
-}
 
-
-    // Add event listeners to trigger conversion automatically when inputs change
-    document.getElementById("from_currency").addEventListener("input", convertCurrency);
-    document.getElementById("to_currency").addEventListener("input", convertCurrency);
-    document.getElementById("amount").addEventListener("input", convertCurrency);
+    document.getElementById("to_currency").addEventListener("input", function() {
+        const currency = document.getElementById("to_currency").value;
+        updateCurrencyImage(currency, "to_currency_img");
+    });
 </script>
 
 </body>

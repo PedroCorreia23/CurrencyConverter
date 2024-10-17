@@ -36,17 +36,20 @@ def get_supported_coins():
         return {}
 
 # Function to fetch the real-time price in USD for a given cryptocurrency (CoinGecko)
-def get_price_in_usd(crypto_id):
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={crypto_id}&vs_currencies=usd"
+def get_crypto_data(crypto_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
-        return data.get(crypto_id, {}).get('usd', None)
+        # Extract price and image data
+        price_usd = data['market_data']['current_price']['usd']
+        image_url = data['image']['thumb']  # Use 'small' or 'large' for larger images
+        return price_usd, image_url
     else:
         print(f"Error: Unable to fetch cryptocurrency data (Status code: {response.status_code})")
-        return None
-
+        return None, None
+    
 # Function to check if the input is a cryptocurrency
 def is_crypto(currency):
     # Simple check for common cryptocurrencies
@@ -59,6 +62,7 @@ def index():
 
 from flask import request
 
+@app.route('/convert', methods=['POST'])
 @app.route('/convert', methods=['POST'])
 def convert():
     try:
@@ -77,28 +81,32 @@ def convert():
         
         if from_currency in coin_mapping:
             from_currency_type = 'crypto'
+            from_currency_id = coin_mapping[from_currency]
+            from_price_usd, from_image_url = get_crypto_data(from_currency_id)
         else:
             from_currency_type = 'fiat'
+            from_price_usd, from_image_url = None, None
         
         if to_currency in coin_mapping:
             to_currency_type = 'crypto'
+            to_currency_id = coin_mapping[to_currency]
+            to_price_usd, to_image_url = get_crypto_data(to_currency_id)
         else:
             to_currency_type = 'fiat'
-        
+            to_price_usd, to_image_url = None, None
+
         # Crypto-to-crypto conversion
         if from_currency_type == 'crypto' and to_currency_type == 'crypto':
-            from_currency_id = coin_mapping[from_currency]
-            to_currency_id = coin_mapping[to_currency]
-
-            from_price_usd = get_price_in_usd(from_currency_id)
-            to_price_usd = get_price_in_usd(to_currency_id)
-
             if from_price_usd is None or to_price_usd is None:
                 return f"Unable to fetch prices for {from_currency.upper()} or {to_currency.upper()}.", 400
 
             rate = from_price_usd / to_price_usd
             converted_amount = amount * rate  # amount is already a float
-            return f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.6f} {to_currency.upper()}."
+            return {
+                "result": f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.6f} {to_currency.upper()}.",
+                "from_image": from_image_url,
+                "to_image": to_image_url
+            }
 
         # Fiat-to-fiat conversion
         elif from_currency_type == 'fiat' and to_currency_type == 'fiat':
@@ -108,31 +116,35 @@ def convert():
                 return f"Unable to fetch exchange rate for {from_currency.upper()} to {to_currency.upper()}.", 400
 
             converted_amount = amount * rate  # amount is already a float
-            return f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.2f} {to_currency.upper()}."
+            return {
+                "result": f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.2f} {to_currency.upper()}."
+            }
 
         # Crypto-to-fiat conversion
         elif from_currency_type == 'crypto' and to_currency_type == 'fiat':
-            from_currency_id = coin_mapping[from_currency]
-            from_price_usd = get_price_in_usd(from_currency_id)
             rate, _ = get_fiat_rate('usd', to_currency)
 
             if from_price_usd is None or rate is None:
                 return f"Unable to fetch prices for {from_currency.upper()} or {to_currency.upper()}.", 400
 
             converted_amount = amount * from_price_usd * rate  # amount is already a float
-            return f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.2f} {to_currency.upper()}."
+            return {
+                "result": f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.2f} {to_currency.upper()}.",
+                "from_image": from_image_url
+            }
 
         # Fiat-to-crypto conversion
         elif from_currency_type == 'fiat' and to_currency_type == 'crypto':
-            to_currency_id = coin_mapping[to_currency]
-            to_price_usd = get_price_in_usd(to_currency_id)
             rate, _ = get_fiat_rate(from_currency, 'usd')
 
             if to_price_usd is None or rate is None:
                 return f"Unable to fetch prices for {from_currency.upper()} or {to_currency.upper()}.", 400
 
             converted_amount = (amount / rate) / to_price_usd  # amount is already a float
-            return f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.6f} {to_currency.upper()}."
+            return {
+                "result": f"{amount} {from_currency.upper()} is equivalent to {converted_amount:.6f} {to_currency.upper()}.",
+                "to_image": to_image_url
+            }
         
         return "Invalid input.", 400
 
